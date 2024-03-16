@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\App;
+use Rawilk\Printing\Facades\Printing;
 
 use function Laravel\Prompts\error;
 
@@ -14,21 +15,30 @@ class PrinterController extends Controller
 
     public function getPrinters(){
 
-        $os = php_uname('s');
+        $printers = Printing::printers();
 
-        switch ($os) {
-            case 'windows':
-            case 'Windows NT':
-                return $this->getWindowsPrinters();
-            case 'linux':
-                return $this->getLinuxPrinters();
-            case 'darwin':
-                // get same network conneted printers
-            case 'android':
-                // get same network conneted printers
-            default:
-                return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
-            }
+        $printerNames =[];
+        foreach ($printers as $printer) {
+         $printerNames [] = $printer->name();
+        }
+
+        return $printerNames;
+
+        // $os = php_uname('s');
+
+        // switch ($os) {
+        //     case 'windows':
+        //     case 'Windows NT':
+        //         return $this->getWindowsPrinters();
+        //     case 'linux':
+        //         return $this->getLinuxPrinters();
+        //     case 'darwin':
+        //         // get same network conneted printers
+        //     case 'android':
+        //         // get same network conneted printers
+        //     default:
+        //         return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
+        //     }
     }
         private function getWindowsPrinters() {
             exec('powershell -Command "Get-WmiObject -Query \'SELECT * FROM Win32_Printer\' | Select-Object Name"', $output, $returnCode);

@@ -9,7 +9,11 @@
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.3",
-        "laravel/tinker": "^2.8"
+        "laravel/tinker": "^2.8",
+        "php-http/message-factory": "^1.1",
+        "psr/http-factory": "^1.0",
+        "rawilk/laravel-printing": "^3.0",
+        "smalot/cups-ipp": "^0.5.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9.1",
