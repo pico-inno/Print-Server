@@ -15,11 +15,10 @@ class PrinterController extends Controller
     public function getPrinters(){
 
         $os = php_uname('s');
-        // dd($os);
 
         switch ($os) {
             case 'windows':
-            case 'winnt':
+            case 'Windows NT':
                 return $this->getWindowsPrinters();
             case 'linux':
                 return $this->getLinuxPrinters();
@@ -91,6 +90,8 @@ class PrinterController extends Controller
         }
 
         $printerName = $this->getPrinter();
+
+        // dd($printerName);
 
         if ($printerName === 'N/A') {
             return response()->json(['response' => '', 'error' => 'No printer selected']);
