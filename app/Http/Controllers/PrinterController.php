@@ -137,14 +137,17 @@ class PrinterController extends Controller
                 $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject '$rawData'\"";
                 $return_var = 0;
                 exec($command, $output, $return_var);
-            if ($return_var !== 0) {
-                return response()->json(['response' => '', 'error' => 'Failed to print']);
-            }
+                if ($return_var !== 0) {
+                    return response()->json(['response' => '', 'error' => 'Failed to print']);
+                }
             break;
 
             case 'linux':
                 $command = "echo '$rawData' | lp -d '$printerName' -o raw -";
                 exec($command, $output, $return_var);
+                if ($return_var !== 0) {
+                    return response()->json(['response' => '', 'error' => 'Failed to print']);
+                }
             break;
 
             case 'macos':
