@@ -15,30 +15,32 @@ class PrinterController extends Controller
 
     public function getPrinters(){
 
-        $printers = Printing::printers();
+        // $printers = Printing::printers();
 
-        $printerNames =[];
-        foreach ($printers as $printer) {
-         $printerNames [] = $printer->name();
-        }
+        // $printerNames =[];
+        // foreach ($printers as $printer) {
+        //  $printerNames [] = $printer->name();
+        // }
 
-        return $printerNames;
+        // return $printerNames;
 
-        // $os = php_uname('s');
+        $os = php_uname('s');
 
-        // switch ($os) {
-        //     case 'windows':
-        //     case 'Windows NT':
-        //         return $this->getWindowsPrinters();
-        //     case 'linux':
-        //         return $this->getLinuxPrinters();
-        //     case 'darwin':
-        //         // get same network conneted printers
-        //     case 'android':
-        //         // get same network conneted printers
-        //     default:
-        //         return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
-        //     }
+
+
+        switch ($os) {
+            case 'windows':
+            case 'Windows NT':
+                return $this->getWindowsPrinters();
+            case 'Linux':
+                return $this->getLinuxPrinters();
+            case 'darwin':
+                // get same network conneted printers
+            case 'android':
+                // get same network conneted printers
+            default:
+                return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
+            }
     }
         private function getWindowsPrinters() {
             exec('powershell -Command "Get-WmiObject -Query \'SELECT * FROM Win32_Printer\' | Select-Object Name"', $output, $returnCode);
