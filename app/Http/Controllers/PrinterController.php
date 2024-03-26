@@ -18,10 +18,6 @@ class PrinterController extends Controller
                 return 'windows';
             case 'linux':
                 return 'linux';
-            case 'darwin':
-                return 'macos';
-            case 'android':
-                return 'android';
             default:
                 return 'unsupported';
         }
@@ -36,10 +32,6 @@ class PrinterController extends Controller
                 return $this->getWindowsPrinters();
             case 'linux':
                 return $this->getLinuxPrinters();
-            case 'darwin':
-                // get same network conneted printers
-            case 'android':
-                // get same network conneted printers
             default:
                 return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
             }
@@ -68,24 +60,24 @@ class PrinterController extends Controller
     }
 
      // get linux connected printers
-    private function getLinuxPrinters() {
-        exec('lpstat -p', $output, $returnCode);
+        private function getLinuxPrinters() {
+            exec('lpstat -p', $output, $returnCode);
 
-        if ($returnCode !== 0) {
-            return response()->json(['response' => '', 'error' => 'Error executing lpstat command']);
-        }
-        $printerNames = [];
-        foreach ($output as $line) {
-            if (preg_match('/printer\s+(.+)/', $line, $matches)) {
-                $printerNames[] = $matches[1];
+            if ($returnCode !== 0) {
+                return response()->json(['response' => '', 'error' => 'Error executing lpstat command']);
             }
-        }
+            $printerNames = [];
+            foreach ($output as $line) {
+                if (preg_match('/printer\s+(.+)\s+is/', $line, $matches)) {
+                    $printerNames[] = $matches[1];
+                }
+            }
 
-        if (empty($printerNames)) {
-            return response()->json(['response' => '', 'error' => 'No printers found']);
+            if (empty($printerNames)) {
+                return response()->json(['response' => '', 'error' => 'No printers found']);
+            }
+            return response()->json(['response' => implode('|', $printerNames), 'error' => '']);
         }
-        return response()->json(['response' => implode('|', $printerNames), 'error' => '']);
-    }
 
     // select printer to session data
     public function setPrinter($name) {
@@ -114,20 +106,20 @@ class PrinterController extends Controller
             return response()->json(['response' => '', 'error' => 'No printer selected']);
         }
 
-        // $request->validate([
-        //     'raw_data' => 'required|string',
-        // ]);
+        $request->validate([
+            'raw_data' => 'required|string',
+        ]);
 
-        // $rawData = $request->input('raw_data');
-        $rawData = 'hello, this is printing test on windows';
-        $filePath = public_path('test.txt');
+        $rawData = $request->input('raw_data');
+        // $rawData = 'hello, this is printing test on windows';
+        // $filePath = public_path('test.txt');
         // check os and run print cmd
         $os = $this->getOperatingSystem();
 
         switch ($os) {
             case 'windows':
-                // $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject '$rawData'\"";
-                $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject (Get-Content '$filePath')\"";
+                $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject '$rawData'\"";
+                // $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject (Get-Content '$filePath')\"";
                 $return_var = 0;
                 $return_var = 0;
                 exec($command, $output, $return_var);
@@ -137,16 +129,13 @@ class PrinterController extends Controller
             break;
 
             case 'linux':
-                // $command = "echo '$rawData' | lp -d '$printerName' -o raw -";
-                $command = "lp -d $printerName '$filePath'";
+                $command = "echo '$rawData' | lp -d '$printerName' -o raw -";
+                // $command = "lp -d $printerName '$filePath'";
                 exec($command, $output, $return_var);
                 if ($return_var !== 0) {
                     return response()->json(['response' => '', 'error' => 'Failed to print']);
                 }
             break;
-
-            case 'macos':
-            case 'android':
 
             default:
             return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
