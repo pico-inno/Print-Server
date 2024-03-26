@@ -3,17 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Log;
-use Rawilk\Printing\Facades\Printing;
-
-use function Laravel\Prompts\error;
 
 class PrinterController extends Controller
 {
-
     // check os
     private function getOperatingSystem()
     {
@@ -38,7 +31,6 @@ class PrinterController extends Controller
     public function getPrinters(){
 
         $os = $this->getOperatingSystem();
-
         switch ($os) {
             case 'windows':
                 return $this->getWindowsPrinters();
@@ -128,22 +120,25 @@ class PrinterController extends Controller
 
         // $rawData = $request->input('raw_data');
         $rawData = 'hello, this is printing test on windows';
-
+        $filePath = public_path('test.txt');
         // check os and run print cmd
         $os = $this->getOperatingSystem();
 
         switch ($os) {
             case 'windows':
-                $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject '$rawData'\"";
+                // $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject '$rawData'\"";
+                $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject (Get-Content '$filePath')\"";
+                $return_var = 0;
                 $return_var = 0;
                 exec($command, $output, $return_var);
-            if ($return_var !== 0) {
-                return response()->json(['response' => '', 'error' => 'Failed to print']);
-            }
+                if ($return_var !== 0) {
+                    return response()->json(['response' => '', 'error' => 'Failed to print']);
+                }
             break;
 
             case 'linux':
-                $command = "echo '$rawData' | lp -d '$printerName' -o raw -";
+                // $command = "echo '$rawData' | lp -d '$printerName' -o raw -";
+                $command = "lp -d $printerName '$filePath'";
                 exec($command, $output, $return_var);
             break;
 
