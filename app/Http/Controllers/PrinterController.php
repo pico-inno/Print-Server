@@ -140,6 +140,9 @@ class PrinterController extends Controller
                 // $command = "echo '$rawData' | lp -d '$printerName' -o raw -";
                 $command = "lp -d $printerName '$filePath'";
                 exec($command, $output, $return_var);
+                if ($return_var !== 0) {
+                    return response()->json(['response' => '', 'error' => 'Failed to print']);
+                }
             break;
 
             case 'macos':
