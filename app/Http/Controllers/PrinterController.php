@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Storage;
 
 class PrinterController extends Controller
 {
@@ -60,67 +61,60 @@ class PrinterController extends Controller
     }
 
      // get linux connected printers
-        private function getLinuxPrinters() {
-            exec('lpstat -p', $output, $returnCode);
+    private function getLinuxPrinters() {
+        exec('lpstat -p', $output, $returnCode);
 
-            if ($returnCode !== 0) {
-                return response()->json(['response' => '', 'error' => 'Error executing lpstat command']);
+        if ($returnCode !== 0) {
+            return response()->json(['response' => '', 'error' => 'Error executing lpstat command']);
+        }
+        $printerNames = [];
+        foreach ($output as $line) {
+            if (preg_match('/printer\s+(.+)\s+is/', $line, $matches)) {
+                $printerNames[] = $matches[1];
             }
-            $printerNames = [];
-            foreach ($output as $line) {
-                if (preg_match('/printer\s+(.+)\s+is/', $line, $matches)) {
-                    $printerNames[] = $matches[1];
-                }
-            }
-
-            if (empty($printerNames)) {
-                return response()->json(['response' => '', 'error' => 'No printers found']);
-            }
-            return response()->json(['response' => implode('|', $printerNames), 'error' => '']);
         }
 
+        if (empty($printerNames)) {
+            return response()->json(['response' => '', 'error' => 'No printers found']);
+        }
+        return response()->json(['response' => implode('|', $printerNames), 'error' => '']);
+    }
+
     // select printer to session data
-    public function setPrinter($name) {
-        Session::put('selected_printer', $name);
-        return response()->json(['response' => 'Printer set to ' . $name]);
+    public function setPrinter($printer) {
+        Storage::put('printer.txt', $printer);
+        return response()->json(['message' => 'Printer set to ' . $printer]);
     }
 
     // get selected printer from session data
     public function getPrinter()
     {
-        $selectedPrinter = Session::get('selected_printer', 'N/A');
-        return $selectedPrinter;
+        if (Storage::exists('printer.txt')) {
+            return Storage::get('printer.txt');
+        } else {
+            return 'N/A';
+        }
     }
 
     // print raw
     public function printRaw(Request $request)
     {
-
-        if (!$request->session()->isStarted()) {
-            $request->session()->start();
-        }
-
         $printerName = $this->getPrinter();
 
         if ($printerName === 'N/A') {
             return response()->json(['response' => '', 'error' => 'No printer selected']);
         }
-
         $request->validate([
             'raw_data' => 'required|string',
         ]);
 
         $rawData = $request->input('raw_data');
-        // $rawData = 'hello, this is printing test on windows';
-        // $filePath = public_path('test.txt');
         // check os and run print cmd
         $os = $this->getOperatingSystem();
 
         switch ($os) {
             case 'windows':
                 $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject '$rawData'\"";
-                // $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject (Get-Content '$filePath')\"";
-                $return_var = 0;
                 $return_var = 0;
                 exec($command, $output, $return_var);
                 if ($return_var !== 0) {
@@ -147,24 +141,30 @@ class PrinterController extends Controller
 
     public function printFileByUrl(Request $request)
     {
-
-        if (!$request->session()->isStarted()) {
-            $request->session()->start();
+        $printerName = $this->getPrinter();
+        if ($printerName === 'N/A') {
+            return response()->json(['response' => '', 'error' => 'No printer selected']);
         }
 
-        $printerName = $this->getPrinter();
-
-        $request->validate([
+        // Validate the request
+        $validatedData = $request->validate([
             'url' => 'required|url',
         ]);
+        $url = $validatedData['url'];
 
-        $url = $request->input('url');
+        $fileType = mime_content_type($url);
 
-        // check os and run print
+        if ($fileType === 'application/pdf') {
+            // Print the PDF file
+            $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$url' -NoNewWindow -Wait\"";
 
-        if (true) {
-            return response()->json(['response' => 'OK', 'error' => '']);
         } else {
+            // Assume it's a text file and print it
+            $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject (Get-Content '$url')\"";
+        }
+        $return_var = 0;
+        exec($command, $output, $return_var);
+        if ($return_var !== 0) {
             return response()->json(['response' => '', 'error' => 'Failed to print']);
         }
     }
