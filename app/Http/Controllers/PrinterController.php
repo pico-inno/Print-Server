@@ -142,26 +142,29 @@ class PrinterController extends Controller
     }
 
     public function printFileByUrl(Request $request)
-{
-    $printerName = $this->getPrinter();
-    if ($printerName === 'N/A') {
-        return response()->json(['response' => '', 'error' => 'No printer selected']);
-    }
+    {
+        $printerName = $this->getPrinter();
+        if ($printerName === 'N/A') {
+            return response()->json(['response' => '', 'error' => 'No printer selected']);
+        }
 
-    $os = $this->getOperatingSystem();
+        $os = $this->getOperatingSystem();
 
-    // $validatedUrl = $request->validate([
-        //     'url' => 'required|url',
-        // ]);
-    $url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
-    $response = Http::get($url);
+        // $validatedUrl = $request->validate([
+            //     'url' => 'required|url',
+            // ]);
+        $url = "https://www.orimi.com/pdf-test.pdf";
+        $response = Http::get($url);
 
-    if ($response->successful()) {
+        if (!$response->successful()) {
+            return response()->json(['response' => '', 'error' => "Failed to fetch URL: $url"]);
+        }
+
         $contentType = $response->header('Content-Type');
 
         switch ($os) {
             case 'windows':
-                if (strpos($contentType, 'application/pdf')!== false) {
+                if (strpos($contentType, 'application/pdf') !== false) {
                     $pdfContent = $response->body();
                     $tempFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
                     file_put_contents($tempFile, $pdfContent);
@@ -182,15 +185,21 @@ class PrinterController extends Controller
                 break;
 
             case 'linux':
-                if (strpos($contentType, 'text/html') === 0) {
-                    $htmlContent = $response->body();
-                    $tempHtmlFile = tempnam(sys_get_temp_dir(), 'html_content_');
-                    file_put_contents($tempHtmlFile, $htmlContent);
+                if (strpos($contentType, 'application/pdf') !== false) {
+                    $pdfContent = $response->body();
 
                     $tempPdfFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
-                    exec("wkhtmltopdf '$tempHtmlFile' '$tempPdfFile'");
+                    file_put_contents($tempPdfFile, $pdfContent);
 
                     $command = "lp -d $printerName '$tempPdfFile'";
+                } elseif (strpos($contentType, 'text/html') === 0) {
+                    $htmlContent = $response->body();
+
+                    $command = "lp -d $printerName -o raw -";
+                    $process = proc_open($command, [0 => ['pipe', 'r']], $pipes);
+                    fwrite($pipes[0], $htmlContent);
+                    fclose($pipes[0]);
+                    proc_close($process);
                 } else {
                     return response()->json(['response' => '', 'error' => "Unsupported content type: $contentType"]);
                 }
@@ -198,7 +207,6 @@ class PrinterController extends Controller
 
             default:
                 return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
-                break;
         }
 
         $output = [];
@@ -215,14 +223,10 @@ class PrinterController extends Controller
             unlink($tempFile);
         }
 
-        if (isset($tempHtmlFile, $tempPdfFile)) {
-            unlink($tempHtmlFile);
+        if (isset($tempPdfFile)) {
             unlink($tempPdfFile);
         }
-    } else {
-        return response()->json(['response' => '', 'error' => "Failed to fetch URL: $url"]);
     }
-}
 
 }
 
