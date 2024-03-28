@@ -149,11 +149,11 @@ class PrinterController extends Controller
         }
 
         $os = $this->getOperatingSystem();
-
-        $validatedUrl = $request->validate([
-                'url' => 'required|url',
-            ]);
+        $validatedData = $request->validate([
+            'url' => 'required|url',
+        ]);
         // $validatedUrl = "https://www.example.com";
+        $validatedUrl = $validatedData['url'];
         $response = Http::get($validatedUrl);
 
         if (!$response->successful()) {
