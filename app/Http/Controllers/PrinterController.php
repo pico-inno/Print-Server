@@ -150,14 +150,14 @@ class PrinterController extends Controller
 
         $os = $this->getOperatingSystem();
 
-        // $validatedUrl = $request->validate([
-            //     'url' => 'required|url',
-            // ]);
-        $url = "https://www.orimi.com/pdf-test.pdf";
-        $response = Http::get($url);
+        $validatedUrl = $request->validate([
+                'url' => 'required|url',
+            ]);
+        // $validatedUrl = "https://www.example.com";
+        $response = Http::get($validatedUrl);
 
         if (!$response->successful()) {
-            return response()->json(['response' => '', 'error' => "Failed to fetch URL: $url"]);
+            return response()->json(['response' => '', 'error' => "Failed to fetch URL: $validatedUrl"]);
         }
 
         $contentType = $response->header('Content-Type');
@@ -194,12 +194,14 @@ class PrinterController extends Controller
                     $command = "lp -d $printerName '$tempPdfFile'";
                 } elseif (strpos($contentType, 'text/html') === 0) {
                     $htmlContent = $response->body();
+                    $dompdf = new Dompdf();
+                    $dompdf->loadHtml($htmlContent);
+                    $dompdf->render();
 
-                    $command = "lp -d $printerName -o raw -";
-                    $process = proc_open($command, [0 => ['pipe', 'r']], $pipes);
-                    fwrite($pipes[0], $htmlContent);
-                    fclose($pipes[0]);
-                    proc_close($process);
+                    $tempPdfFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
+                    file_put_contents($tempPdfFile,  $dompdf->output());
+
+                    $command = "lp -d $printerName '$tempPdfFile'";
                 } else {
                     return response()->json(['response' => '', 'error' => "Unsupported content type: $contentType"]);
                 }
