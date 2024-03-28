@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use Dompdf\Dompdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 
@@ -140,34 +142,87 @@ class PrinterController extends Controller
     }
 
     public function printFileByUrl(Request $request)
-    {
-        $printerName = $this->getPrinter();
-        if ($printerName === 'N/A') {
-            return response()->json(['response' => '', 'error' => 'No printer selected']);
+{
+    $printerName = $this->getPrinter();
+    if ($printerName === 'N/A') {
+        return response()->json(['response' => '', 'error' => 'No printer selected']);
+    }
+
+    $os = $this->getOperatingSystem();
+
+    // $validatedUrl = $request->validate([
+        //     'url' => 'required|url',
+        // ]);
+    $url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+    $response = Http::get($url);
+
+    if ($response->successful()) {
+        $contentType = $response->header('Content-Type');
+
+        switch ($os) {
+            case 'windows':
+                if (strpos($contentType, 'application/pdf')!== false) {
+                    $pdfContent = $response->body();
+                    $tempFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
+                    file_put_contents($tempFile, $pdfContent);
+                    $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$tempFile' -NoNewWindow -Wait\"";
+                } elseif (strpos($contentType, 'text/html') === 0) {
+                    $htmlContent = $response->body();
+                    $dompdf = new Dompdf();
+                    $dompdf->loadHtml($htmlContent);
+                    $dompdf->render();
+
+                    $tempFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
+                    file_put_contents($tempFile,  $dompdf->output());
+
+                    $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$tempFile' -NoNewWindow -Wait\"";
+                } else {
+                    return response()->json(['response' => '', 'error' => "Unsupported content type: $contentType"]);
+                }
+                break;
+
+            case 'linux':
+                if (strpos($contentType, 'text/html') === 0) {
+                    $htmlContent = $response->body();
+                    $tempHtmlFile = tempnam(sys_get_temp_dir(), 'html_content_');
+                    file_put_contents($tempHtmlFile, $htmlContent);
+
+                    $tempPdfFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
+                    exec("wkhtmltopdf '$tempHtmlFile' '$tempPdfFile'");
+
+                    $command = "lp -d $printerName '$tempPdfFile'";
+                } else {
+                    return response()->json(['response' => '', 'error' => "Unsupported content type: $contentType"]);
+                }
+                break;
+
+            default:
+                return response()->json(['response' => '', 'error' => 'Unsupported operating system']);
+                break;
         }
 
-        // Validate the request
-        $validatedData = $request->validate([
-            'url' => 'required|url',
-        ]);
-        $url = $validatedData['url'];
-
-        $fileType = mime_content_type($url);
-
-        if ($fileType === 'application/pdf') {
-            // Print the PDF file
-            $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$url' -NoNewWindow -Wait\"";
-
-        } else {
-            // Assume it's a text file and print it
-            $command = "powershell -Command \"Out-Printer -Name '$printerName' -InputObject (Get-Content '$url')\"";
-        }
+        $output = [];
         $return_var = 0;
         exec($command, $output, $return_var);
-        if ($return_var !== 0) {
-            return response()->json(['response' => '', 'error' => 'Failed to print']);
+
+        if ($return_var === 0) {
+            return response()->json(['response' => 'Print command executed successfully!']);
+        } else {
+            return response()->json(['response' => '', 'error' => 'Failed to execute print command.']);
         }
+
+        if (isset($tempFile)) {
+            unlink($tempFile);
+        }
+
+        if (isset($tempHtmlFile, $tempPdfFile)) {
+            unlink($tempHtmlFile);
+            unlink($tempPdfFile);
+        }
+    } else {
+        return response()->json(['response' => '', 'error' => "Failed to fetch URL: $url"]);
     }
+}
 
 }
 
