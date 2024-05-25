@@ -1,7 +1,8 @@
 <?php
 
-use App\Http\Controllers\FrontendPrinterController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PrinterController;
+use App\Http\Controllers\FrontendPrinterController;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+Route::post('/', [PrinterController::class, 'printRaw']);
 Route::get('/', function () {
     return view('welcome');
 });

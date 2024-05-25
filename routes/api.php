@@ -21,10 +21,14 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 
 Route::prefix('v1')->group(function () {
-Route::get('/printers', [PrinterController::class, 'getPrinters']);
-Route::get('/set-printer/{printer}', [PrinterController::class, 'setPrinter']);
-Route::get('/printer', [PrinterController::class, 'getPrinter']);
-Route::post('/print-raw', [PrinterController::class, 'printRaw']);
-Route::post('/print-url', [PrinterController::class, 'printFileByUrl']);
+    Route::get('/check/connection', [PrinterController::class, 'checkConnection']);
+    Route::get('/printers', [PrinterController::class, 'getPrinters']);
+    Route::get('/set-printer/{printer}', [PrinterController::class, 'setPrinter']);
+    Route::get('/printer', [PrinterController::class, 'getPrinter']);
+    Route::post('/print-raw', [PrinterController::class, 'printRaw']);
+    Route::post('/print-raw-to-pdf', [PrinterController::class, 'printRawToPdf']);
+    Route::post('/print-url', [PrinterController::class, 'printFileByUrl']);
+    Route::post('/print-pdf', [PrinterController::class, 'printFile']);
+
 });
 

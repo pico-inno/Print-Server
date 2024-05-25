@@ -4,12 +4,24 @@ namespace App\Http\Controllers;
 
 use Dompdf\Dompdf;
 use Illuminate\Http\Request;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 
 class PrinterController extends Controller
 {
+    public $adobeAppName="Acrobat.exe";
+    public function getPrintCmdForWindow($tempFile,$printerName){
+        $adobeAppName=$this->adobeAppName;
+        return  "start  $adobeAppName  /r  /t \"$tempFile\" \"$printerName\"";
+    }
+    //check connection
+    public function checkConnection(){
+        return response()->json([
+            'message'=>'success'
+        ], 200);
+    }
     // check os
     private function getOperatingSystem()
     {
@@ -26,6 +38,11 @@ class PrinterController extends Controller
         }
     }
 
+
+    public function getPrintersNameForWindows($result){
+        $text = str_replace("Name|", "", $result);
+        return explode("|", $text);
+    }
     // check connected printers
     public function getPrinters(){
 
@@ -50,7 +67,7 @@ class PrinterController extends Controller
 
         $printerNames = [];
         foreach ($output as $line) {
-            if (trim($line)!== '' && strpos($line, '----') === false) {
+            if (trim($line)!== '' && strpos($line, '----') === false && $line!='Name') {
                 $printerNames[] = trim($line);
             }
         }
@@ -58,7 +75,7 @@ class PrinterController extends Controller
         if (empty($printerNames)) {
             return response()->json(['response' => '', 'error' => 'No printer found...']);
         } else {
-            return response()->json(['response' => implode('|', $printerNames), 'error' => '']);
+            return response()->json(['response' =>$printerNames]);
         }
     }
 
@@ -102,7 +119,6 @@ class PrinterController extends Controller
     public function printRaw(Request $request)
     {
         $printerName = $this->getPrinter();
-
         if ($printerName === 'N/A') {
             return response()->json(['response' => '', 'error' => 'No printer selected']);
         }
@@ -110,7 +126,7 @@ class PrinterController extends Controller
             'raw_data' => 'required|string',
         ]);
 
-        $rawData = $request->input('raw_data');
+        $rawData = strip_tags($request->input('raw_data'));
         // check os and run print cmd
         $os = $this->getOperatingSystem();
 
@@ -148,6 +164,7 @@ class PrinterController extends Controller
             return response()->json(['response' => '', 'error' => 'No printer selected']);
         }
 
+        $printerName='EPSON L3110 Series';
         $os = $this->getOperatingSystem();
         $validatedData = $request->validate([
             'url' => 'required|url',
@@ -168,7 +185,11 @@ class PrinterController extends Controller
                     $pdfContent = $response->body();
                     $tempFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
                     file_put_contents($tempFile, $pdfContent);
-                    $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$tempFile' -NoNewWindow -Wait\"";
+                    logger([$tempFile,'tempfile']);
+                    // $command=start AcroRd32.exe
+
+                    $command = "start Acrobat.exe /r /t \"$tempFile\" \"$printerName\"";
+                    // $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$tempFile' -NoNewWindow -Wait\"";
                 } elseif (strpos($contentType, 'text/html') === 0) {
                     $htmlContent = $response->body();
                     $dompdf = new Dompdf();
@@ -178,7 +199,9 @@ class PrinterController extends Controller
                     $tempFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
                     file_put_contents($tempFile,  $dompdf->output());
 
-                    $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$tempFile' -NoNewWindow -Wait\"";
+
+                    $command = "start Acrobat.exe /t \"$tempFile\" \"$printerName\"";
+                    // $command = "powershell -Command \"Start-Process -FilePath 'C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe' -ArgumentList '/t', '$tempFile' -NoNewWindow -Wait\"";
                 } else {
                     return response()->json(['response' => '', 'error' => "Unsupported content type: $contentType"]);
                 }
@@ -230,6 +253,116 @@ class PrinterController extends Controller
         }
     }
 
+
+    public function printRawToPdf(Request $request){
+        $html = $request->input('raw_data');
+        $pdf= Pdf::html($html)
+        ->format('a4')
+        ->save('../test.pdf');
+
+        $tempFile=realpath('../test.pdf');
+        $printerName='EPSON L3110 Series';
+
+        // $command = "print $printerName $tempFile";
+
+        $command = "start Acrobat.exe /r /t \"$tempFile\" \"$printerName\"";
+        $output = [];
+        $return_var = 0;
+        exec($command, $output, $return_var);
+
+
+        // unlink('../test.pdf');
+        // return $pdf;
+        // logger($html);
+        // // Create Dompdf instance
+        // $dompdf = new Dompdf();
+
+        // // Load HTML content
+        // $dompdf->loadHtml($html);
+
+        // // Set paper size and orientation (optional)
+        // $dompdf->setPaper('A4', 'portrait');
+
+        // // Render PDF (optional)
+        //  $dompdf->render();
+
+
+        // // Get the generated PDF content
+        // // $pdfContent = $dompdf->output();
+        // // Stream PDF to the browser
+        // return $dompdf->stream('document.pdf');
+    }
+
+    public function printFile2(Request $request)
+    {
+        // Extract the pdfContent from the request
+        logger($request->toArray());
+        $pdfContent = base64_decode($request->input('file'));
+        logger($pdfContent);
+        // Generate a unique file name
+        $fileName = 'pdf_content_def' . uniqid() . '.pdf';
+
+        // Save the file using Storage facade
+        Storage::put($fileName, $pdfContent);
+
+        // // Get the path to the saved file
+        // $filePath = Storage::path($fileName);
+        // logger([$filePath,'tempfile']);
+
+
+        $printerName = 'EPSON L3110 Series';
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'pdf_content_');
+        file_put_contents($tempFile, $pdfContent);
+        logger([$tempFile,'tempfile']);
+        // $command=start AcroRd32.exe
+
+        // $command = "start Acrobat.exe  /r  /t \"$tempFile\" \"$printerName\"";
+        $command =$this-> getPrintCmdForWindow($tempFile,$printerName);
+        $output = [];
+        $return_var = 0;
+        exec($command, $output, $return_var);
+
+
+
+
+
+        // logger($pdfFilePath);
+        // file_put_contents($pdfFilePath,  $pdfContent);
+
+        // // Printer name (adjust this to match your printer)
+
+
+        // $command = "start Acrobat.exe /t \"$tempFile\" \"$printerName\"";
+        // // Execute the command
+        $output = [];
+        $return_var = 0;
+        // logger([
+        //     $command, $output, $return_var
+        // ]);
+        // exec($command, $output, $return_var);
+
+        // Optionally, you can check $return_var or $output for error handling
+
+        // Delete the temporary PDF file after printing
+        // unlink($tempFile);
+
+        // Return a response indicating success
+        return response()->json(['success' => true, 'message' => 'File sent to printer']);
+    }
+
+    public function printFile(Request $request)
+{
+    logger('hello');
+    logger($request->toArray());
+    $pdfFile = $request->file('pdf_file');
+    logger($pdfFile);
+    // Handle the uploaded file, such as saving it to storage or processing it further
+
+    return response()->json(['message' => 'PDF uploaded successfully']);
 }
+
+}
+
 
 
